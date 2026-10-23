@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### Added
 - Release knob (0.01–5 s) for a decaying tail after you let go of the trigger. Defaults to the old
   fixed 30 ms, so existing projects sound the same.
@@ -24,6 +26,7 @@ All notable changes to this project are documented here. The format follows
 - Howl feedback and Rodent's RAT drive stage (Drive, Filter), 4x oversampled.
 - MIDI notes and a momentary Trigger pad gate the siren.
 
-[Unreleased]: https://github.com/accraze/wailer/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/accraze/wailer/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/accraze/wailer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/accraze/wailer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/accraze/wailer/releases/tag/v0.1.0
