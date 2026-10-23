@@ -8,6 +8,7 @@
 //! 3. Drive stage borrowed from Rodent: LM308 RAT gain stage (bandwidth + slew limited, rail
 //!    clipping) into a 1N914 diode clipper, then the RAT's passive filter.
 //! 4. Gate envelope and volume. MIDI notes or the Trigger button open the gate.
+//! 5. Tape echo, Space Echo style: darkening, saturating repeats that run away past 100% feedback.
 //!
 //! Oscillator and drive stage run at 4x oversampling to keep aliasing down.
 
@@ -46,6 +47,14 @@ const C_FILTER: f32 = 3.3e-9;
 const ATTACK: f32 = 0.003;
 /// Below this (-100 dB) the release tail snaps to silence instead of decaying forever
 const ENV_FLOOR: f32 = 1e-5;
+
+const ECHO_MAX: f32 = 1.5;
+/// Band-pass in the echo loop, so each repeat gets thinner and darker like worn tape
+const ECHO_LO: f32 = 120.0;
+const ECHO_HI: f32 = 3500.0;
+/// Peak delay modulation at full Wow, in seconds, and the wow rate
+const WOW_DEPTH: f32 = 0.002;
+const WOW_RATE: f32 = 0.6;
 
 /// Wobble LFO shape, i.e. how the siren moves between its two tones.
 #[derive(Enum, PartialEq, Clone, Copy, Debug)]
@@ -307,10 +316,65 @@ impl Voice {
     }
 }
 
+/// Tape echo. The buffer is allocated in `new`, never on the audio thread.
+struct Echo {
+    buf: Vec<f32>,
+    pos: usize,
+    fs: f32,
+    g_lo: f32,
+    g_hi: f32,
+    hp: OnePole,
+    lp: OnePole,
+    wow_phase: f32,
+}
+
+impl Echo {
+    fn new(fs: f32) -> Self {
+        let len = ((ECHO_MAX + WOW_DEPTH) * fs) as usize + 4;
+        Self {
+            buf: vec![0.0; len],
+            pos: 0,
+            fs,
+            g_lo: prewarp(ECHO_LO, fs),
+            g_hi: prewarp(ECHO_HI, fs),
+            hp: OnePole::default(),
+            lp: OnePole::default(),
+            wow_phase: 0.0,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.buf.fill(0.0);
+        self.hp = OnePole::default();
+        self.lp = OnePole::default();
+    }
+
+    /// Feeds `x` in and returns the wet repeats. A smoothed `time` makes the repeats bend in
+    /// pitch while it moves, like turning the knob on a tape echo.
+    fn process(&mut self, x: f32, time: f32, feedback: f32, wow: f32) -> f32 {
+        let len = self.buf.len();
+        let wobble = wow * WOW_DEPTH * (2.0 * PI * self.wow_phase).sin();
+        self.wow_phase = (self.wow_phase + WOW_RATE / self.fs).fract();
+        let delay = ((time + wobble) * self.fs).clamp(1.0, (len - 2) as f32);
+
+        // Linear interpolation between the two samples around the read point
+        let read = self.pos as f32 - delay + len as f32;
+        let (i, frac) = (read as usize, read.fract());
+        let wet = self.buf[i % len] * (1.0 - frac) + self.buf[(i + 1) % len] * frac;
+
+        let fb = self.lp.lp(self.hp.hp(wet, self.g_lo), self.g_hi) * feedback;
+        // Tape saturation bounds the loop, so feedback past 100% runs away without blowing up
+        self.buf[self.pos] = (x + fb).tanh();
+        self.pos = (self.pos + 1) % len;
+        wet
+    }
+}
+
 struct Wailer {
     params: Arc<WailerParams>,
     sample_rate: f32,
     voice: Voice,
+    echo: Echo,
     /// MIDI notes currently held
     notes: u8,
     gate: bool,
@@ -345,6 +409,14 @@ struct WailerParams {
     volume: FloatParam,
     #[id = "release"]
     release: FloatParam,
+    #[id = "echo-time"]
+    echo_time: FloatParam,
+    #[id = "echo-feedback"]
+    echo_feedback: FloatParam,
+    #[id = "echo-wow"]
+    echo_wow: FloatParam,
+    #[id = "echo-mix"]
+    echo_mix: FloatParam,
 }
 
 fn knob(name: &str, default: f32) -> FloatParam {
@@ -418,6 +490,31 @@ impl Default for WailerParams {
             )
             .with_unit(" s")
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
+            echo_time: FloatParam::new(
+                "Echo Time",
+                0.375,
+                FloatRange::Skewed {
+                    min: 0.05,
+                    max: ECHO_MAX,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            // Slow glide so turning it bends the repeats instead of zipper noise
+            .with_smoother(SmoothingStyle::Logarithmic(300.0))
+            .with_unit(" s")
+            .with_value_to_string(formatters::v2s_f32_rounded(3)),
+            echo_feedback: FloatParam::new(
+                "Echo Feedback",
+                0.5,
+                FloatRange::Linear { min: 0.0, max: 1.2 },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("%")
+            .with_value_to_string(formatters::v2s_f32_percentage(0))
+            .with_string_to_value(formatters::s2v_f32_percentage()),
+            echo_wow: knob("Echo Wow", 0.3),
+            // Off by default so projects from before the echo sound the same
+            echo_mix: knob("Echo Mix", 0.0),
         }
     }
 }
@@ -428,6 +525,7 @@ impl Default for Wailer {
             params: Arc::new(WailerParams::default()),
             sample_rate: 48000.0,
             voice: Voice::default(),
+            echo: Echo::new(48000.0),
             notes: 0,
             gate: false,
             env: 0.0,
@@ -476,12 +574,14 @@ impl Plugin for Wailer {
         _context: &mut impl InitContext<Self>,
     ) -> bool {
         self.sample_rate = buffer_config.sample_rate;
+        self.echo = Echo::new(self.sample_rate);
         self.reset();
         true
     }
 
     fn reset(&mut self) {
         self.voice = Voice::new(self.sample_rate);
+        self.echo.clear();
         self.notes = 0;
         self.gate = false;
         self.env = 0.0;
@@ -531,11 +631,19 @@ impl Plugin for Wailer {
             self.env = env_step(self.env, gate, attack, release);
 
             // Keep running while silent so the howl loop and filters stay warm
-            let y = self
+            let dry = self
                 .voice
                 .process(&Coeffs::new(&settings, self.sample_rate))
                 * volume
                 * self.env;
+            // Like a mixer send: the dry siren stays at full level, Mix adds the repeats
+            let wet = self.echo.process(
+                dry,
+                p.echo_time.smoothed.next(),
+                p.echo_feedback.smoothed.next(),
+                p.echo_wow.smoothed.next(),
+            );
+            let y = dry + p.echo_mix.smoothed.next() * wet;
             for sample in frame.iter_mut() {
                 *sample = y;
             }
@@ -700,6 +808,61 @@ mod tests {
             env = env_step(env, false, 0.0, k);
         }
         assert_eq!(env, 0.0);
+    }
+
+    /// Index and value of the biggest sample in `x[from..to]`.
+    fn loudest(x: &[f32], from: usize, to: usize) -> (usize, f32) {
+        (from..to).fold((from, 0.0), |(bi, bv), i| {
+            if x[i].abs() > bv {
+                (i, x[i].abs())
+            } else {
+                (bi, bv)
+            }
+        })
+    }
+
+    #[test]
+    fn echo_repeats_at_the_echo_time_and_decays() {
+        let mut echo = Echo::new(FS);
+        let time = 0.25;
+        let d = (time * FS) as usize;
+        let out: Vec<f32> = (0..4 * d)
+            .map(|i| echo.process(if i < 64 { 0.5 } else { 0.0 }, time, 0.6, 0.0))
+            .collect();
+        assert!(peak(&out[..d - 64]) < 1e-6, "repeat before the echo time");
+        let (at1, first) = loudest(&out, d - 64, 2 * d - 64);
+        let (at2, second) = loudest(&out, 2 * d - 64, 3 * d - 64);
+        assert!(
+            at1.abs_diff(d) < 64 && at2.abs_diff(2 * d) < 128,
+            "{at1} {at2} vs {d}"
+        );
+        assert!(
+            second < first && second > 0.2 * first,
+            "{first} -> {second}"
+        );
+    }
+
+    #[test]
+    fn echo_runs_away_past_full_feedback_but_stays_bounded() {
+        let mut echo = Echo::new(FS);
+        let n = (10.0 * FS) as usize;
+        let out: Vec<f32> = (0..n)
+            .map(|i| {
+                let x = if i < 4800 {
+                    0.3 * (2.0 * PI * 700.0 * i as f32 / FS).sin()
+                } else {
+                    0.0
+                };
+                echo.process(x, 0.1, 1.2, 1.0)
+            })
+            .collect();
+        let tail = &out[n - FS as usize..];
+        assert!(tail.iter().all(|y| y.is_finite()));
+        assert!(
+            peak(tail) > 0.1 && peak(tail) <= 1.0,
+            "tail peak {}",
+            peak(tail)
+        );
     }
 
     #[test]

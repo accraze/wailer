@@ -12,7 +12,7 @@ use std::f32::consts::{PI, TAU};
 use std::sync::Arc;
 
 pub const WIDTH: u32 = 608;
-pub const HEIGHT: u32 = 360;
+pub const HEIGHT: u32 = 486;
 const DESIGN: Rect = Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH as f32, HEIGHT as f32));
 
 const KNOB_RADIUS: f32 = 26.0;
@@ -107,11 +107,11 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
         );
     }
 
-    // Five columns on the left, the trigger alone in the wider right column between the rows
+    // Five columns on the left, the trigger alone in the wider right column
     let col = |i: usize| body.left() + 12.0 + 88.0 * (i as f32 + 0.5);
     let right = (col(4) + 44.0 + body.right()) / 2.0;
-    let (row1, row2) = (body.top() + 144.0, body.top() + 270.0);
-    let rows: [(f32, &[(&FloatParam, &str)]); 2] = [
+    let (row1, row2, row3) = (body.top() + 144.0, body.top() + 270.0, body.top() + 412.0);
+    let rows: [(f32, &[(&FloatParam, &str)]); 3] = [
         (
             row1,
             &[
@@ -131,6 +131,15 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
                 (&params.release, "RELEASE"),
             ],
         ),
+        (
+            row3,
+            &[
+                (&params.echo_time, "TIME"),
+                (&params.echo_feedback, "FEEDBACK"),
+                (&params.echo_wow, "WOW"),
+                (&params.echo_mix, "MIX"),
+            ],
+        ),
     ];
     for (y, knobs) in rows {
         for (i, &(param, label)) in knobs.iter().enumerate() {
@@ -138,13 +147,25 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
         }
     }
 
-    shape_switch(ui, setter, &params.shape, Pos2::new(col(4), row1));
-    trigger(
-        ui,
-        setter,
-        &params.trigger,
-        Pos2::new(right, (row1 + row2) / 2.0),
+    // Divider with a caption setting the echo row apart from the siren
+    let divider = Pos2::new(body.left() + 24.0, (row2 + row3) / 2.0 - 4.0);
+    let caption = p.text(
+        divider,
+        Align2::LEFT_CENTER,
+        "T A P E   E C H O",
+        FontId::proportional(11.0),
+        Color32::from_gray(170),
     );
+    p.line_segment(
+        [
+            Pos2::new(caption.right() + 10.0, divider.y),
+            Pos2::new(body.right() - 24.0, divider.y),
+        ],
+        Stroke::new(1.0_f32, Color32::from_gray(80)),
+    );
+
+    shape_switch(ui, setter, &params.shape, Pos2::new(col(4), row1));
+    trigger(ui, setter, &params.trigger, Pos2::new(right, row2));
 }
 
 /// Unit vector for a knob angle, measured clockwise from straight up.

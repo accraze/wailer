@@ -31,6 +31,9 @@ cargo clippy --release --lib
 - Gate = held MIDI notes or the `trigger` param. A rising edge restarts the LFO. `env_step` is a linear 3 ms
   attack and an exponential release (`release` param = time to -60 dB), snapping to 0 below -100 dB. The voice keeps running while
   the gate is closed so the release tail and filter states stay clean.
+- `Echo` runs after the gate envelope and keeps running when the gate is closed, so repeats ring out. Its buffer
+  is allocated in `initialize()` (never in `process()`/`reset()`, which only clears it). Echo Time has a slow
+  300 ms smoother on purpose: the glide is the tape pitch-bend. The `tanh` on the write keeps >100% feedback bounded.
 - GUI lives in `src/editor.rs`: a hand-painted siren box (egui `Painter`) whose `knob()`, `screw()` and window
   scaling are copied from Rodent's pedal editor (see `../rodent/CLAUDE.md` for how scaling works). The trigger
   button is momentary: it holds the `trigger` param on only while the mouse is down.

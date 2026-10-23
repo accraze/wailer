@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Tape echo (Time, Feedback, Wow, Mix). Repeats darken and saturate, run away past 100% feedback, and
+  bend in pitch while you turn Time. Mix defaults to 0, so existing projects sound the same.
+
 ## [0.3.0] - 2026-10-23
 
 ### Added
