@@ -28,7 +28,8 @@ cargo clippy --release --lib
 - The RAT stage is copied from Rodent (fixed 1N914 diodes); keep circuit constants tied to real values.
 - Howl feeds the clipped signal back through a 300 Hz–3 kHz band-pass. The high-pass part is what keeps the
   loop from latching to DC (`howl_changes_the_sound` checks this).
-- Gate = held MIDI notes or the `trigger` param. A rising edge restarts the LFO. The voice keeps running while
+- Gate = held MIDI notes or the `trigger` param. A rising edge restarts the LFO. `env_step` is a linear 3 ms
+  attack and an exponential release (`release` param = time to -60 dB), snapping to 0 below -100 dB. The voice keeps running while
   the gate is closed so the release tail and filter states stay clean.
 - GUI lives in `src/editor.rs`: a hand-painted siren box (egui `Painter`) whose `knob()`, `screw()` and window
   scaling are copied from Rodent's pedal editor (see `../rodent/CLAUDE.md` for how scaling works). The trigger

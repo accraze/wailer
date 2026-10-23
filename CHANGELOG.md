@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Release knob (0.01–5 s) for a decaying tail after you let go of the trigger. Defaults to the old
+  fixed 30 ms, so existing projects sound the same.
+
 ## [0.2.0] - 2026-10-23
 
 ### Changed

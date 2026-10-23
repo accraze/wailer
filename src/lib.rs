@@ -42,9 +42,10 @@ const R_FILTER_MIN: f32 = 1.5e3;
 const R_FILTER_POT: f32 = 100e3;
 const C_FILTER: f32 = 3.3e-9;
 
-/// Gate fade in/out times in seconds: short enough to feel instant, long enough not to click
+/// Gate fade-in time in seconds: short enough to feel instant, long enough not to click
 const ATTACK: f32 = 0.003;
-const RELEASE: f32 = 0.03;
+/// Below this (-100 dB) the release tail snaps to silence instead of decaying forever
+const ENV_FLOOR: f32 = 1e-5;
 
 /// Wobble LFO shape, i.e. how the siren moves between its two tones.
 #[derive(Enum, PartialEq, Clone, Copy, Debug)]
@@ -161,6 +162,23 @@ fn blep(t: f32, dt: f32) -> f32 {
     } else {
         0.0
     }
+}
+
+/// One sample of the gate envelope: linear attack, exponential release.
+/// `release_k` is the per-sample decay factor from `release_coeff`.
+fn env_step(env: f32, gate: bool, attack_step: f32, release_k: f32) -> f32 {
+    if gate {
+        (env + attack_step).min(1.0)
+    } else if env * release_k < ENV_FLOOR {
+        0.0
+    } else {
+        env * release_k
+    }
+}
+
+/// Per-sample decay factor that takes the release `secs` seconds to fall 60 dB.
+fn release_coeff(secs: f32, fs: f32) -> f32 {
+    0.001f32.powf(1.0 / (secs * fs))
 }
 
 /// Plain knob values, so tests can drive the DSP without a plugin instance.
@@ -325,6 +343,8 @@ struct WailerParams {
     filter: FloatParam,
     #[id = "volume"]
     volume: FloatParam,
+    #[id = "release"]
+    release: FloatParam,
 }
 
 fn knob(name: &str, default: f32) -> FloatParam {
@@ -386,6 +406,18 @@ impl Default for WailerParams {
             .with_unit(" dB")
             .with_value_to_string(formatters::v2s_f32_gain_to_db(1))
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            // Default matches the fixed 30 ms release of 0.2.0, so older projects sound the same
+            release: FloatParam::new(
+                "Release",
+                0.03,
+                FloatRange::Skewed {
+                    min: 0.01,
+                    max: 5.0,
+                    factor: FloatRange::skew_factor(-2.0),
+                },
+            )
+            .with_unit(" s")
+            .with_value_to_string(formatters::v2s_f32_rounded(2)),
         }
     }
 }
@@ -462,7 +494,6 @@ impl Plugin for Wailer {
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let attack = 1.0 / (ATTACK * self.sample_rate);
-        let release = 1.0 / (RELEASE * self.sample_rate);
         let p = &self.params;
         let mut next_event = context.next_event();
 
@@ -496,11 +527,8 @@ impl Plugin for Wailer {
                 filter: p.filter.smoothed.next(),
             };
             let volume = p.volume.smoothed.next();
-            self.env = if gate {
-                (self.env + attack).min(1.0)
-            } else {
-                (self.env - release).max(0.0)
-            };
+            let release = release_coeff(p.release.value(), self.sample_rate);
+            self.env = env_step(self.env, gate, attack, release);
 
             // Keep running while silent so the howl loop and filters stay warm
             let y = self
@@ -633,6 +661,20 @@ mod tests {
         };
         let f = freq(&render(&s, FS, 1.0), FS);
         assert!((f - 500.0).abs() < 5.0, "{f}");
+    }
+
+    #[test]
+    fn release_falls_60_db_in_release_time_then_goes_silent() {
+        let (secs, k) = (0.5, release_coeff(0.5, FS));
+        let mut env = 1.0;
+        for _ in 0..(secs * FS) as usize {
+            env = env_step(env, false, 0.0, k);
+        }
+        assert!((util::gain_to_db(env) + 60.0).abs() < 0.5, "{env}");
+        for _ in 0..(secs * FS) as usize {
+            env = env_step(env, false, 0.0, k);
+        }
+        assert_eq!(env, 0.0);
     }
 
     #[test]

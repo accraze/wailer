@@ -11,7 +11,7 @@ use nih_plug_egui::{create_egui_editor, resizable_window::ResizableWindow};
 use std::f32::consts::{PI, TAU};
 use std::sync::Arc;
 
-pub const WIDTH: u32 = 520;
+pub const WIDTH: u32 = 608;
 pub const HEIGHT: u32 = 360;
 const DESIGN: Rect = Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH as f32, HEIGHT as f32));
 
@@ -107,14 +107,14 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
         );
     }
 
-    // Four knob columns on the left, switch and trigger in the wider right column
+    // Five columns on the left, the trigger alone in the wider right column between the rows
     let col = |i: usize| body.left() + 12.0 + 88.0 * (i as f32 + 0.5);
-    let right = (col(3) + 44.0 + body.right()) / 2.0;
+    let right = (col(4) + 44.0 + body.right()) / 2.0;
     let (row1, row2) = (body.top() + 144.0, body.top() + 270.0);
-    let rows = [
+    let rows: [(f32, &[(&FloatParam, &str)]); 2] = [
         (
             row1,
-            [
+            &[
                 (&params.tone, "TONE"),
                 (&params.interval, "INTERVAL"),
                 (&params.rate, "RATE"),
@@ -123,22 +123,28 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
         ),
         (
             row2,
-            [
+            &[
                 (&params.howl, "HOWL"),
                 (&params.drive, "DRIVE"),
                 (&params.filter, "FILTER"),
                 (&params.volume, "VOLUME"),
+                (&params.release, "RELEASE"),
             ],
         ),
     ];
     for (y, knobs) in rows {
-        for (i, (param, label)) in knobs.into_iter().enumerate() {
+        for (i, &(param, label)) in knobs.iter().enumerate() {
             knob(ui, setter, param, label, Pos2::new(col(i), y));
         }
     }
 
-    shape_switch(ui, setter, &params.shape, Pos2::new(right, row1));
-    trigger(ui, setter, &params.trigger, Pos2::new(right, row2));
+    shape_switch(ui, setter, &params.shape, Pos2::new(col(4), row1));
+    trigger(
+        ui,
+        setter,
+        &params.trigger,
+        Pos2::new(right, (row1 + row2) / 2.0),
+    );
 }
 
 /// Unit vector for a knob angle, measured clockwise from straight up.
@@ -319,7 +325,7 @@ fn shape_switch(ui: &Ui, setter: &ParamSetter, param: &EnumParam<Shape>, center:
 
 /// Big red arcade-style button. Sounds only while held, like the button on a siren box.
 fn trigger(ui: &Ui, setter: &ParamSetter, param: &BoolParam, center: Pos2) {
-    const RADIUS: f32 = 34.0;
+    const RADIUS: f32 = 40.0;
     let rect = Rect::from_center_size(center, Vec2::splat(2.0 * RADIUS));
     let response = ui.interact(rect, ui.id().with("trigger"), Sense::click_and_drag());
     let down = response.is_pointer_button_down_on();
@@ -354,7 +360,7 @@ fn trigger(ui: &Ui, setter: &ParamSetter, param: &BoolParam, center: Pos2) {
         Color32::from_rgba_unmultiplied(255, 255, 255, 60),
     );
     p.text(
-        center - Vec2::new(0.0, KNOB_RADIUS + 16.0),
+        center - Vec2::new(0.0, RADIUS + 16.0),
         Align2::CENTER_BOTTOM,
         "TRIGGER",
         FontId::proportional(12.0),

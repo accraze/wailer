@@ -5,7 +5,7 @@
 A sound-system dub siren plugin (CLAP / VST3) built with [nih-plug](https://github.com/robbert-vdh/nih-plug),
 after the classic Jamaican dual-tone siren boxes.
 
-<p align="center"><img src="docs/screenshot.png" alt="Wailer plugin window" width="520"></p>
+<p align="center"><img src="docs/screenshot.png" alt="Wailer plugin window" width="608"></p>
 
 A square oscillator wobbles between two tones, then goes through Howl feedback and the RAT
 drive stage from [Rodent](https://github.com/accraze/rodent). It's an instrument: hold a MIDI
@@ -23,6 +23,7 @@ note or the Trigger pad to sound it. Put a delay after it.
 | Drive        | 0–100%, clean → screaming (RAT gain stage + diode clipper)   |
 | Filter       | 0–100% (clockwise = darker)                                  |
 | Volume       | −30 to +12 dB                                                |
+| Release      | 0.01–5 s tail after you let go (time to fall 60 dB)          |
 
 Knobs: drag or scroll to turn, hold Shift for fine control, double-click to reset.
 Drag the bottom-right corner to resize the window.
