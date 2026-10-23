@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-23
+
 ### Added
 - Factory presets with a ‹ › selector: Classic, Sound System, Police Wail, Laser, Rising Howl, Dread Drop
   and Runaway. Level-matched to within 1 dB of Classic; shows CUSTOM once you tweak a knob.
@@ -36,7 +38,8 @@ All notable changes to this project are documented here. The format follows
 - Howl feedback and Rodent's RAT drive stage (Drive, Filter), 4x oversampled.
 - MIDI notes and a momentary Trigger pad gate the siren.
 
-[Unreleased]: https://github.com/accraze/wailer/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/accraze/wailer/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/accraze/wailer/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/accraze/wailer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/accraze/wailer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/accraze/wailer/compare/v0.1.0...v0.2.0
