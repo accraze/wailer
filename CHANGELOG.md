@@ -6,10 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-23
+
 ### Added
 - Dual-tone siren: square oscillator wobbling between Tone and Tone + Interval, with Two-tone,
   Wail, Rise and Fall wobble shapes.
 - Howl feedback and Rodent's RAT drive stage (Drive, Filter), 4x oversampled.
 - MIDI notes and a momentary Trigger pad gate the siren.
 
-[Unreleased]: https://github.com/accraze/wailer/commits/main
+[Unreleased]: https://github.com/accraze/wailer/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/accraze/wailer/releases/tag/v0.1.0
