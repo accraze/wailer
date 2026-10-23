@@ -651,6 +651,31 @@ mod tests {
     }
 
     #[test]
+    fn rise_and_fall_sweep_the_right_way() {
+        // 1 Hz wobble over an octave: compare pitch in the first and last fifth of the cycle
+        let sweep = |shape| {
+            let s = Settings {
+                tone: 500.0,
+                interval: 12.0,
+                rate: 1.0,
+                shape,
+                drive: 0.0,
+                filter: 0.0,
+                ..settings()
+            };
+            let out = render(&s, FS, 1.0);
+            let fifth = out.len() / 5;
+            (freq(&out[..fifth], FS), freq(&out[4 * fifth..], FS))
+        };
+        let (start, end) = sweep(Shape::Rise);
+        assert!(end > 1.5 * start, "rise {start} -> {end}");
+        let (start, end) = sweep(Shape::Fall);
+        assert!(start > 1.5 * end, "fall {start} -> {end}");
+        let (start, end) = sweep(Shape::Triangle);
+        assert!((start / end - 1.0).abs() < 0.1, "wail {start} -> {end}");
+    }
+
+    #[test]
     fn zero_depth_holds_tone_a() {
         let s = Settings {
             tone: 500.0,
