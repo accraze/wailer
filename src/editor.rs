@@ -1,7 +1,7 @@
 //! Siren-box editor painted by hand: two rows of knobs, a wobble shape switch and a big red
 //! momentary trigger button. Knob, screw and window scaling come from Rodent's pedal editor.
 
-use crate::{Shape, WailerParams};
+use crate::{Preset, Shape, WailerParams, PRESETS};
 use nih_plug::prelude::*;
 use nih_plug_egui::egui::{
     self, emath::TSTransform, Align2, Color32, FontId, Painter, Pos2, Rect, Sense, Stroke,
@@ -165,6 +165,7 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
     );
 
     shape_switch(ui, setter, &params.shape, Pos2::new(col(4), row1));
+    preset_selector(ui, setter, params, Pos2::new((col(4) + right) / 2.0, row3));
     trigger(ui, setter, &params.trigger, Pos2::new(right, row2));
 }
 
@@ -384,6 +385,105 @@ fn trigger(ui: &Ui, setter: &ParamSetter, param: &BoolParam, center: Pos2) {
         center - Vec2::new(0.0, RADIUS + 16.0),
         Align2::CENTER_BOTTOM,
         "TRIGGER",
+        FontId::proportional(12.0),
+        WHITE,
+    );
+}
+
+/// Index of the preset the current (unmodulated) settings match, if any.
+fn matching_preset(params: &WailerParams) -> Option<usize> {
+    PRESETS.iter().position(|p| {
+        params.shape.unmodulated_plain_value() == p.shape
+            && params.preset_values(p).iter().all(|(param, value)| {
+                (param.unmodulated_normalized_value() - param.preview_normalized(*value)).abs()
+                    < 1e-4
+            })
+    })
+}
+
+fn apply_preset(setter: &ParamSetter, params: &WailerParams, preset: &Preset) {
+    for (param, value) in params.preset_values(preset) {
+        setter.begin_set_parameter(param);
+        setter.set_parameter(param, value);
+        setter.end_set_parameter(param);
+    }
+    setter.begin_set_parameter(&params.shape);
+    setter.set_parameter(&params.shape, preset.shape);
+    setter.end_set_parameter(&params.shape);
+}
+
+/// `‹ NAME ›` selector. Shows "CUSTOM" once the knobs no longer match a preset.
+fn preset_selector(ui: &Ui, setter: &ParamSetter, params: &WailerParams, center: Pos2) {
+    let slot = Rect::from_center_size(center, Vec2::new(150.0, 22.0));
+    let arrow_size = Vec2::new(22.0, slot.height());
+    let prev_rect = Rect::from_min_size(slot.left_top(), arrow_size);
+    let next_rect =
+        Rect::from_min_size(slot.right_top() - Vec2::new(arrow_size.x, 0.0), arrow_size);
+    let prev = ui.interact(
+        prev_rect.expand(4.0),
+        ui.id().with("preset-prev"),
+        Sense::click(),
+    );
+    let next = ui.interact(
+        next_rect.expand(4.0),
+        ui.id().with("preset-next"),
+        Sense::click(),
+    );
+
+    let current = matching_preset(params);
+    // Remember the last pick so stepping from CUSTOM continues from where you were
+    let memory_id = ui.id().with("preset-last");
+    let last = current.or_else(|| ui.data(|d| d.get_temp::<usize>(memory_id)));
+    let n = PRESETS.len();
+    let step = if prev.clicked() {
+        Some(last.map_or(n - 1, |i| (i + n - 1) % n))
+    } else if next.clicked() {
+        Some(last.map_or(0, |i| (i + 1) % n))
+    } else {
+        None
+    };
+    if let Some(i) = step {
+        apply_preset(setter, params, &PRESETS[i]);
+        ui.data_mut(|d| d.insert_temp(memory_id, i));
+    }
+
+    let p = ui.painter();
+    p.rect_filled(slot, 11.0, Color32::from_gray(4));
+    p.rect_stroke(
+        slot,
+        11.0,
+        Stroke::new(1.0_f32, Color32::from_gray(60)),
+        StrokeKind::Outside,
+    );
+    for (rect, response, flip) in [(prev_rect, &prev, -1.0), (next_rect, &next, 1.0)] {
+        let c = rect.center();
+        let color = if response.hovered() {
+            WHITE
+        } else {
+            Color32::from_gray(150)
+        };
+        let triangle = vec![
+            c + Vec2::new(4.0 * flip, 0.0),
+            c + Vec2::new(-3.0 * flip, -5.0),
+            c + Vec2::new(-3.0 * flip, 5.0),
+        ];
+        p.add(egui::Shape::convex_polygon(triangle, color, Stroke::NONE));
+    }
+    let (name, color) = match current {
+        Some(i) => (PRESETS[i].name.to_uppercase(), WHITE),
+        None => ("CUSTOM".to_string(), Color32::from_gray(150)),
+    };
+    p.text(
+        slot.center(),
+        Align2::CENTER_CENTER,
+        name,
+        FontId::proportional(12.0),
+        color,
+    );
+    p.text(
+        Pos2::new(center.x, center.y - KNOB_RADIUS - 16.0),
+        Align2::CENTER_BOTTOM,
+        "PRESET",
         FontId::proportional(12.0),
         WHITE,
     );

@@ -83,6 +83,45 @@ impl Shape {
     }
 }
 
+/// Factory preset. Trigger isn't part of a preset.
+struct Preset {
+    name: &'static str,
+    tone: f32,
+    interval: f32,
+    rate: f32,
+    depth: f32,
+    shape: Shape,
+    howl: f32,
+    drive: f32,
+    filter: f32,
+    volume_db: f32,
+    release: f32,
+    echo_time: f32,
+    echo_feedback: f32,
+    echo_wow: f32,
+    echo_mix: f32,
+}
+
+/// Volumes are level-matched to "Classic", see `presets_are_level_matched`. Classic must equal the
+/// param defaults so new instances show CLASSIC, see `classic_is_the_default`.
+#[rustfmt::skip]
+const PRESETS: &[Preset] = &[
+    Preset { name: "Classic",      tone:  700.0, interval:   5.0, rate:  3.00, depth: 1.0, shape: Shape::Square,   howl: 0.00, drive: 0.30, filter: 0.30,
+             volume_db:  0.0, release: 0.03, echo_time: 0.375, echo_feedback: 0.50, echo_wow: 0.3, echo_mix: 0.0 },
+    Preset { name: "Sound System", tone:  650.0, interval:   7.0, rate:  2.50, depth: 1.0, shape: Shape::Square,   howl: 0.10, drive: 0.40, filter: 0.35,
+             volume_db:  0.0, release: 0.60, echo_time: 0.375, echo_feedback: 0.65, echo_wow: 0.3, echo_mix: 0.6 },
+    Preset { name: "Police Wail",  tone:  600.0, interval:  12.0, rate:  0.50, depth: 1.0, shape: Shape::Triangle, howl: 0.00, drive: 0.20, filter: 0.20,
+             volume_db: -0.5, release: 0.30, echo_time: 0.300, echo_feedback: 0.40, echo_wow: 0.2, echo_mix: 0.4 },
+    Preset { name: "Laser",        tone: 1800.0, interval: -24.0, rate: 12.00, depth: 1.0, shape: Shape::Fall,     howl: 0.00, drive: 0.50, filter: 0.10,
+             volume_db: -1.0, release: 0.15, echo_time: 0.250, echo_feedback: 0.60, echo_wow: 0.3, echo_mix: 0.5 },
+    Preset { name: "Rising Howl",  tone:  400.0, interval:  12.0, rate:  0.80, depth: 1.0, shape: Shape::Rise,     howl: 0.75, drive: 0.60, filter: 0.40,
+             volume_db:  1.0, release: 1.00, echo_time: 0.500, echo_feedback: 0.70, echo_wow: 0.4, echo_mix: 0.5 },
+    Preset { name: "Dread Drop",   tone: 1200.0, interval: -19.0, rate:  0.35, depth: 1.0, shape: Shape::Fall,     howl: 0.20, drive: 0.70, filter: 0.50,
+             volume_db:  0.5, release: 2.00, echo_time: 0.600, echo_feedback: 0.85, echo_wow: 0.5, echo_mix: 0.6 },
+    Preset { name: "Runaway",      tone:  900.0, interval:   5.0, rate:  6.00, depth: 1.0, shape: Shape::Square,   howl: 0.30, drive: 0.50, filter: 0.30,
+             volume_db:  0.5, release: 0.30, echo_time: 0.200, echo_feedback: 1.10, echo_wow: 0.6, echo_mix: 0.7 },
+];
+
 /// Topology-preserving one-pole filter, gives both low-pass and high-pass outputs.
 #[derive(Default, Clone, Copy)]
 struct OnePole {
@@ -419,6 +458,28 @@ struct WailerParams {
     echo_mix: FloatParam,
 }
 
+impl WailerParams {
+    /// Every float param paired with its value in `preset`, shared by the GUI's preset matching
+    /// and applying and by the tests.
+    fn preset_values(&self, p: &Preset) -> [(&FloatParam, f32); 13] {
+        [
+            (&self.tone, p.tone),
+            (&self.interval, p.interval),
+            (&self.rate, p.rate),
+            (&self.depth, p.depth),
+            (&self.howl, p.howl),
+            (&self.drive, p.drive),
+            (&self.filter, p.filter),
+            (&self.volume, util::db_to_gain(p.volume_db)),
+            (&self.release, p.release),
+            (&self.echo_time, p.echo_time),
+            (&self.echo_feedback, p.echo_feedback),
+            (&self.echo_wow, p.echo_wow),
+            (&self.echo_mix, p.echo_mix),
+        ]
+    }
+}
+
 fn knob(name: &str, default: f32) -> FloatParam {
     FloatParam::new(name, default, FloatRange::Linear { min: 0.0, max: 1.0 })
         .with_smoother(SmoothingStyle::Linear(20.0))
@@ -705,6 +766,10 @@ mod tests {
         x.iter().fold(0.0, |m, y| m.max(y.abs()))
     }
 
+    fn rms(x: &[f32]) -> f32 {
+        (x.iter().map(|y| y * y).sum::<f32>() / x.len() as f32).sqrt()
+    }
+
     /// Frequency estimate from rising zero crossings.
     fn freq(x: &[f32], fs: f32) -> f32 {
         let n = x.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
@@ -863,6 +928,53 @@ mod tests {
             "tail peak {}",
             peak(tail)
         );
+    }
+
+    #[test]
+    fn classic_is_the_default() {
+        let params = WailerParams::default();
+        for (param, value) in params.preset_values(&PRESETS[0]) {
+            let (preset, default) = (
+                param.preview_normalized(value),
+                param.default_normalized_value(),
+            );
+            assert!(
+                (preset - default).abs() < 1e-4,
+                "{}: {preset} vs {default}",
+                param.name()
+            );
+        }
+        assert_eq!(PRESETS[0].shape, params.shape.default_plain_value());
+    }
+
+    #[test]
+    fn presets_are_level_matched() {
+        // Dry siren only; the echo adds on top, which is the point of turning it up
+        let level = |p: &Preset| {
+            let s = Settings {
+                tone: p.tone,
+                interval: p.interval,
+                rate: p.rate,
+                depth: p.depth,
+                shape: p.shape,
+                howl: p.howl,
+                drive: p.drive,
+                filter: p.filter,
+            };
+            let out = render(&s, FS, 2.0);
+            util::gain_to_db(rms(&out[out.len() / 4..])) + p.volume_db
+        };
+        let reference = level(&PRESETS[0]);
+        for p in PRESETS {
+            let diff = level(p) - reference;
+            println!("{:<12} {diff:+.1} dB", p.name);
+            assert!(
+                diff.abs() < 1.0,
+                "{} is {diff:+.1} dB vs {}",
+                p.name,
+                PRESETS[0].name
+            );
+        }
     }
 
     #[test]

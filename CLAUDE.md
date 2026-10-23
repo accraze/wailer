@@ -34,6 +34,10 @@ cargo clippy --release --lib
 - `Echo` runs after the gate envelope and keeps running when the gate is closed, so repeats ring out. Its buffer
   is allocated in `initialize()` (never in `process()`/`reset()`, which only clears it). Echo Time has a slow
   300 ms smoother on purpose: the glide is the tape pitch-bend. The `tanh` on the write keeps >100% feedback bounded.
+- `PRESETS` in `lib.rs` are factory presets. `WailerParams::preset_values` pairs each float param with its preset
+  value; the GUI's matching/applying and the tests all go through it, so add new params there too. Volumes are
+  level-matched to Classic on the dry siren (`presets_are_level_matched`, `--nocapture` prints the offsets), and
+  Classic must equal the param defaults (`classic_is_the_default`).
 - GUI lives in `src/editor.rs`: a hand-painted siren box (egui `Painter`) whose `knob()`, `screw()` and window
   scaling are copied from Rodent's pedal editor (see `../rodent/CLAUDE.md` for how scaling works). The trigger
   button is momentary: it holds the `trigger` param on only while the mouse is down.

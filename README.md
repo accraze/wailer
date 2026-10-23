@@ -28,6 +28,10 @@ instrument: hold a MIDI note or the Trigger button to sound it.
 | Echo Feedback| 0–120%; past 100% the repeats run away (saturated, never blow up) |
 | Echo Wow     | 0–100% tape wow (up to ±2 ms)                                |
 | Echo Mix     | 0–100% repeats added on top of the dry siren (off by default) |
+| Preset       | ‹ › steps through 7 level-matched factory presets; shows CUSTOM once you tweak |
+
+Presets: Classic (dry two-tone, the default), Sound System, Police Wail, Laser, Rising Howl,
+Dread Drop and Runaway (echo feedback past 100%).
 
 Knobs: drag or scroll to turn, hold Shift for fine control, double-click to reset.
 Drag the bottom-right corner to resize the window.

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Factory presets with a ‹ › selector: Classic, Sound System, Police Wail, Laser, Rising Howl, Dread Drop
+  and Runaway. Level-matched to within 1 dB of Classic; shows CUSTOM once you tweak a knob.
+
 ## [0.4.0] - 2026-10-23
 
 ### Added
