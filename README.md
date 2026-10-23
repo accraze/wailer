@@ -1,0 +1,59 @@
+# Wailer
+
+[![CI](https://github.com/accraze/wailer/actions/workflows/ci.yml/badge.svg)](https://github.com/accraze/wailer/actions/workflows/ci.yml)
+
+A sound-system dub siren plugin (CLAP / VST3) built with [nih-plug](https://github.com/robbert-vdh/nih-plug),
+after the classic Jamaican dual-tone siren boxes.
+
+A square oscillator wobbles between two tones, then goes through Howl feedback and the RAT
+drive stage from [Rodent](https://github.com/accraze/rodent). It's an instrument: hold a MIDI
+note or the Trigger pad to sound it. Put a delay after it.
+
+| Control      | Range                                                        |
+|--------------|--------------------------------------------------------------|
+| Trigger      | Momentary pad (also any MIDI note); each hit restarts the wobble |
+| Tone         | 100–3000 Hz (tone A)                                         |
+| Interval     | −24 to +24 semitones to tone B (fractional for detuned/beating) |
+| Wobble Rate  | 0.1–30 Hz                                                    |
+| Wobble Depth | 0–100% of the way from tone A to tone B                      |
+| Wobble Shape | Two-tone (square), Wail (triangle), Rise, Fall               |
+| Howl         | 0–100% feedback around the drive stage; squeals past ~70%    |
+| Drive        | 0–100%, clean → screaming (RAT gain stage + diode clipper)   |
+| Filter       | 0–100% (clockwise = darker)                                  |
+| Volume       | −30 to +12 dB                                                |
+
+## Build
+
+Needs a recent Rust from [rustup](https://rustup.rs) (distro packages are usually too old).
+The GUI (egui) also needs X11/GL headers:
+
+```sh
+sudo apt install libx11-xcb-dev libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libgl-dev
+```
+
+```sh
+cargo xtask bundle wailer --release
+cargo test --lib
+```
+
+Bundles land in `target/bundled/`.
+
+## Install (Linux)
+
+Grab `wailer-<version>-linux.zip` from [Releases](https://github.com/accraze/wailer/releases) and unzip it, or build it yourself. Then:
+
+```sh
+cp target/bundled/Wailer.clap ~/.clap/
+cp -r target/bundled/Wailer.vst3 ~/.vst3/   # optional
+```
+
+Then rescan plug-ins in your DAW.
+
+## Releasing
+
+Changes are listed in [CHANGELOG.md](CHANGELOG.md). See [docs/RELEASING.md](docs/RELEASING.md) for the process. In short: bump the version, push an annotated `v*` tag, and CI publishes the release.
+
+## License
+
+Wailer is licensed under the [GNU General Public License v3.0 or later](LICENSE).
+nih-plug itself is ISC licensed, but its VST3 bindings are GPLv3, so VST3 builds must be GPL anyway.
