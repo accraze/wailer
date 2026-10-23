@@ -34,6 +34,7 @@ cargo clippy --release --lib
   scaling are copied from Rodent's pedal editor (see `../rodent/CLAUDE.md` for how scaling works). The trigger
   button is momentary: it holds the `trigger` param on only while the mouse is down.
 - README screenshot: build a standalone copy in the scratchpad (`standalone` feature, `rlib` crate type, a
-  `main.rs` calling `nih_export_standalone`), run it with `--backend dummy`, and grab the window with `import`.
+  `main.rs` calling `nih_export_standalone`), run it with `--backend dummy`, and grab the window with `import`. Match its title exactly (`"Wailer": ()` in `xwininfo -root -tree`):
+  an open Bitwig instance has a "Wailer / Wailer" window that a loose grep picks up instead.
 - The audio thread must not allocate (`assert_process_allocs` is enabled).
 - `CLAP_ID` and `VST3_CLASS_ID` must never change, or saved Bitwig projects lose the plugin.

@@ -110,7 +110,7 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
     // Four knob columns on the left, switch and trigger in the wider right column
     let col = |i: usize| body.left() + 12.0 + 88.0 * (i as f32 + 0.5);
     let right = (col(3) + 44.0 + body.right()) / 2.0;
-    let (row1, row2) = (body.top() + 128.0, body.top() + 256.0);
+    let (row1, row2) = (body.top() + 144.0, body.top() + 270.0);
     let rows = [
         (
             row1,
