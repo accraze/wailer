@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
 ### Changed
 - Hand-painted siren-box editor: knobs, a Two-tone/Wail/Rise/Fall switch and a big red momentary trigger
   button. Resizable (drag the bottom-right corner). Fixes the bottom controls being cut off.
@@ -18,5 +20,6 @@ All notable changes to this project are documented here. The format follows
 - Howl feedback and Rodent's RAT drive stage (Drive, Filter), 4x oversampled.
 - MIDI notes and a momentary Trigger pad gate the siren.
 
-[Unreleased]: https://github.com/accraze/wailer/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/accraze/wailer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/accraze/wailer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/accraze/wailer/releases/tag/v0.1.0
