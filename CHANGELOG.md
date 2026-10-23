@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Hand-painted siren-box editor: knobs, a Two-tone/Wail/Rise/Fall switch and a big red momentary trigger
+  button. Resizable (drag the bottom-right corner). Fixes the bottom controls being cut off.
+
 ## [0.1.0] - 2026-10-23
 
 ### Added

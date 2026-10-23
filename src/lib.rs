@@ -301,7 +301,8 @@ struct Wailer {
 
 #[derive(Params)]
 struct WailerParams {
-    #[persist = "editor-state"]
+    // Renamed from "editor-state" so projects saved with the 0.1.0 slider UI open at the new size
+    #[persist = "editor-size"]
     editor_state: Arc<EguiState>,
 
     #[id = "trigger"]

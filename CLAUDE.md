@@ -30,6 +30,10 @@ cargo clippy --release --lib
   loop from latching to DC (`howl_changes_the_sound` checks this).
 - Gate = held MIDI notes or the `trigger` param. A rising edge restarts the LFO. The voice keeps running while
   the gate is closed so the release tail and filter states stay clean.
-- `editor.rs` is a placeholder (generic sliders + momentary trigger pad); a hand-painted siren box is planned.
+- GUI lives in `src/editor.rs`: a hand-painted siren box (egui `Painter`) whose `knob()`, `screw()` and window
+  scaling are copied from Rodent's pedal editor (see `../rodent/CLAUDE.md` for how scaling works). The trigger
+  button is momentary: it holds the `trigger` param on only while the mouse is down.
+- README screenshot: build a standalone copy in the scratchpad (`standalone` feature, `rlib` crate type, a
+  `main.rs` calling `nih_export_standalone`), run it with `--backend dummy`, and grab the window with `import`.
 - The audio thread must not allocate (`assert_process_allocs` is enabled).
 - `CLAP_ID` and `VST3_CLASS_ID` must never change, or saved Bitwig projects lose the plugin.
