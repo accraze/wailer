@@ -7,8 +7,10 @@
 //!    loop squeals on its own as Howl goes up.
 //! 3. Drive stage borrowed from Rodent: LM308 RAT gain stage (bandwidth + slew limited, rail
 //!    clipping) into a 1N914 diode clipper, then the RAT's passive filter.
-//! 4. Gate envelope and volume. MIDI notes or the Trigger button open the gate.
+//! 4. Gate envelope. MIDI notes or the Trigger button open the gate; on release the pitch can
+//!    glide down by Drop semitones over the Release time.
 //! 5. Tape echo, Space Echo style: darkening, saturating repeats that run away past 100% feedback.
+//! 6. Volume.
 //!
 //! Oscillator and drive stage run at 4x oversampling to keep aliasing down.
 
@@ -96,6 +98,7 @@ struct Preset {
     filter: f32,
     volume_db: f32,
     release: f32,
+    drop: f32,
     echo_time: f32,
     echo_feedback: f32,
     echo_wow: f32,
@@ -107,19 +110,19 @@ struct Preset {
 #[rustfmt::skip]
 const PRESETS: &[Preset] = &[
     Preset { name: "Classic",      tone:  700.0, interval:   5.0, rate:  3.00, depth: 1.0, shape: Shape::Square,   howl: 0.00, drive: 0.30, filter: 0.30,
-             volume_db:  0.0, release: 0.03, echo_time: 0.375, echo_feedback: 0.50, echo_wow: 0.3, echo_mix: 0.0 },
+             volume_db:  0.0, release: 0.03, drop:  0.0, echo_time: 0.375, echo_feedback: 0.50, echo_wow: 0.3, echo_mix: 0.0 },
     Preset { name: "Sound System", tone:  650.0, interval:   7.0, rate:  2.50, depth: 1.0, shape: Shape::Square,   howl: 0.10, drive: 0.40, filter: 0.35,
-             volume_db:  0.0, release: 0.60, echo_time: 0.375, echo_feedback: 0.65, echo_wow: 0.3, echo_mix: 0.6 },
+             volume_db:  0.0, release: 0.60, drop:  0.0, echo_time: 0.375, echo_feedback: 0.65, echo_wow: 0.3, echo_mix: 0.6 },
     Preset { name: "Police Wail",  tone:  600.0, interval:  12.0, rate:  0.50, depth: 1.0, shape: Shape::Triangle, howl: 0.00, drive: 0.20, filter: 0.20,
-             volume_db: -0.5, release: 0.30, echo_time: 0.300, echo_feedback: 0.40, echo_wow: 0.2, echo_mix: 0.4 },
+             volume_db: -0.5, release: 0.30, drop:  0.0, echo_time: 0.300, echo_feedback: 0.40, echo_wow: 0.2, echo_mix: 0.4 },
     Preset { name: "Laser",        tone: 1800.0, interval: -24.0, rate: 12.00, depth: 1.0, shape: Shape::Fall,     howl: 0.00, drive: 0.50, filter: 0.10,
-             volume_db: -1.0, release: 0.15, echo_time: 0.250, echo_feedback: 0.60, echo_wow: 0.3, echo_mix: 0.5 },
+             volume_db: -1.0, release: 0.15, drop: 24.0, echo_time: 0.250, echo_feedback: 0.60, echo_wow: 0.3, echo_mix: 0.5 },
     Preset { name: "Rising Howl",  tone:  400.0, interval:  12.0, rate:  0.80, depth: 1.0, shape: Shape::Rise,     howl: 0.75, drive: 0.60, filter: 0.40,
-             volume_db:  1.0, release: 1.00, echo_time: 0.500, echo_feedback: 0.70, echo_wow: 0.4, echo_mix: 0.5 },
+             volume_db:  1.0, release: 1.00, drop:  0.0, echo_time: 0.500, echo_feedback: 0.70, echo_wow: 0.4, echo_mix: 0.5 },
     Preset { name: "Dread Drop",   tone: 1200.0, interval: -19.0, rate:  0.35, depth: 1.0, shape: Shape::Fall,     howl: 0.20, drive: 0.70, filter: 0.50,
-             volume_db:  0.5, release: 2.00, echo_time: 0.600, echo_feedback: 0.85, echo_wow: 0.5, echo_mix: 0.6 },
+             volume_db:  0.5, release: 2.00, drop: 24.0, echo_time: 0.600, echo_feedback: 0.85, echo_wow: 0.5, echo_mix: 0.6 },
     Preset { name: "Runaway",      tone:  900.0, interval:   5.0, rate:  6.00, depth: 1.0, shape: Shape::Square,   howl: 0.30, drive: 0.50, filter: 0.30,
-             volume_db:  0.5, release: 0.30, echo_time: 0.200, echo_feedback: 1.10, echo_wow: 0.6, echo_mix: 0.7 },
+             volume_db:  0.5, release: 0.30, drop:  0.0, echo_time: 0.200, echo_feedback: 1.10, echo_wow: 0.6, echo_mix: 0.7 },
 ];
 
 /// Topology-preserving one-pole filter, gives both low-pass and high-pass outputs.
@@ -234,6 +237,8 @@ fn release_coeff(secs: f32, fs: f32) -> f32 {
 struct Settings {
     tone: f32,
     interval: f32,
+    /// Semitones below the wobbling pitch, from Drop
+    bend: f32,
     rate: f32,
     depth: f32,
     shape: Shape,
@@ -246,6 +251,7 @@ struct Settings {
 struct Coeffs {
     tone: f32,
     interval: f32,
+    bend: f32,
     lfo_step: f32,
     depth: f32,
     shape: Shape,
@@ -275,6 +281,7 @@ impl Coeffs {
         Self {
             tone: s.tone,
             interval: s.interval,
+            bend: s.bend,
             lfo_step: s.rate / fs,
             depth: s.depth,
             shape: s.shape,
@@ -324,7 +331,7 @@ impl Voice {
     fn process(&mut self, c: &Coeffs) -> f32 {
         let pos = c.shape.at(self.lfo_phase) * c.depth;
         self.lfo_phase = (self.lfo_phase + c.lfo_step).fract();
-        let freq = c.tone * 2f32.powf(c.interval * pos / 12.0);
+        let freq = c.tone * 2f32.powf((c.interval * pos - c.bend) / 12.0);
         let dt = (freq / c.fs_os).min(0.5);
 
         let mut out = 0.0;
@@ -418,6 +425,8 @@ struct Wailer {
     notes: u8,
     gate: bool,
     env: f32,
+    /// 0 while the gate is open, ramps to 1 over the Release time after it closes
+    drop_pos: f32,
 }
 
 #[derive(Params)]
@@ -448,6 +457,8 @@ struct WailerParams {
     volume: FloatParam,
     #[id = "release"]
     release: FloatParam,
+    #[id = "drop"]
+    drop: FloatParam,
     #[id = "echo-time"]
     echo_time: FloatParam,
     #[id = "echo-feedback"]
@@ -461,7 +472,7 @@ struct WailerParams {
 impl WailerParams {
     /// Every float param paired with its value in `preset`, shared by the GUI's preset matching
     /// and applying and by the tests.
-    fn preset_values(&self, p: &Preset) -> [(&FloatParam, f32); 13] {
+    fn preset_values(&self, p: &Preset) -> [(&FloatParam, f32); 14] {
         [
             (&self.tone, p.tone),
             (&self.interval, p.interval),
@@ -472,6 +483,7 @@ impl WailerParams {
             (&self.filter, p.filter),
             (&self.volume, util::db_to_gain(p.volume_db)),
             (&self.release, p.release),
+            (&self.drop, p.drop),
             (&self.echo_time, p.echo_time),
             (&self.echo_feedback, p.echo_feedback),
             (&self.echo_wow, p.echo_wow),
@@ -551,6 +563,17 @@ impl Default for WailerParams {
             )
             .with_unit(" s")
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
+            // Off by default so projects from before Drop sound the same
+            drop: FloatParam::new(
+                "Drop",
+                0.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 36.0,
+                },
+            )
+            .with_unit(" st")
+            .with_value_to_string(formatters::v2s_f32_rounded(1)),
             echo_time: FloatParam::new(
                 "Echo Time",
                 0.375,
@@ -590,6 +613,7 @@ impl Default for Wailer {
             notes: 0,
             gate: false,
             env: 0.0,
+            drop_pos: 0.0,
         }
     }
 }
@@ -646,6 +670,7 @@ impl Plugin for Wailer {
         self.notes = 0;
         self.gate = false;
         self.env = 0.0;
+        self.drop_pos = 0.0;
     }
 
     fn process(
@@ -677,9 +702,23 @@ impl Plugin for Wailer {
             }
             self.gate = gate;
 
+            let release = p.release.value();
+            self.env = env_step(
+                self.env,
+                gate,
+                attack,
+                release_coeff(release, self.sample_rate),
+            );
+            self.drop_pos = if gate {
+                0.0
+            } else {
+                (self.drop_pos + 1.0 / (release * self.sample_rate)).min(1.0)
+            };
+
             let settings = Settings {
                 tone: p.tone.smoothed.next(),
                 interval: p.interval.smoothed.next(),
+                bend: p.drop.value() * self.drop_pos,
                 rate: p.rate.smoothed.next(),
                 depth: p.depth.smoothed.next(),
                 shape: p.shape.value(),
@@ -687,15 +726,11 @@ impl Plugin for Wailer {
                 drive: p.drive.smoothed.next(),
                 filter: p.filter.smoothed.next(),
             };
-            let volume = p.volume.smoothed.next();
-            let release = release_coeff(p.release.value(), self.sample_rate);
-            self.env = env_step(self.env, gate, attack, release);
 
             // Keep running while silent so the howl loop and filters stay warm
             let dry = self
                 .voice
                 .process(&Coeffs::new(&settings, self.sample_rate))
-                * volume
                 * self.env;
             // Like a mixer send: the dry siren stays at full level, Mix adds the repeats
             let wet = self.echo.process(
@@ -704,7 +739,8 @@ impl Plugin for Wailer {
                 p.echo_feedback.smoothed.next(),
                 p.echo_wow.smoothed.next(),
             );
-            let y = dry + p.echo_mix.smoothed.next() * wet;
+            // Volume after the echo, so it doesn't change how hard the echo saturates
+            let y = (dry + p.echo_mix.smoothed.next() * wet) * p.volume.smoothed.next();
             for sample in frame.iter_mut() {
                 *sample = y;
             }
@@ -746,6 +782,7 @@ mod tests {
         Settings {
             tone: 700.0,
             interval: 5.0,
+            bend: 0.0,
             rate: 3.0,
             depth: 1.0,
             shape: Shape::Square,
@@ -846,6 +883,21 @@ mod tests {
         assert!(start > 1.5 * end, "fall {start} -> {end}");
         let (start, end) = sweep(Shape::Triangle);
         assert!((start / end - 1.0).abs() < 0.1, "wail {start} -> {end}");
+    }
+
+    #[test]
+    fn bend_drops_the_pitch() {
+        // Drop at full travel: 12 semitones under tone A is half the frequency
+        let s = Settings {
+            tone: 500.0,
+            bend: 12.0,
+            depth: 0.0,
+            drive: 0.0,
+            filter: 0.0,
+            ..settings()
+        };
+        let f = freq(&render(&s, FS, 1.0), FS);
+        assert!((f - 250.0).abs() < 5.0, "{f}");
     }
 
     #[test]
@@ -954,6 +1006,7 @@ mod tests {
             let s = Settings {
                 tone: p.tone,
                 interval: p.interval,
+                bend: 0.0,
                 rate: p.rate,
                 depth: p.depth,
                 shape: p.shape,

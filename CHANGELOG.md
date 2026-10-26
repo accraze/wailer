@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Drop knob (0–36 semitones): the pitch glides down over the Release time after you let go, for the
+  classic "pew" ending. Off by default; the Laser and Dread Drop presets now use it.
+
+### Changed
+- Volume now comes after the echo, so it no longer changes how hard the echo saturates. Volume moved to
+  the bottom row to make room for Drop.
+
 ## [0.5.0] - 2026-10-23
 
 ### Added

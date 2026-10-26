@@ -29,7 +29,9 @@ cargo clippy --release --lib
 - Howl feeds the clipped signal back through a 300 Hz–3 kHz band-pass. The high-pass part is what keeps the
   loop from latching to DC (`howl_changes_the_sound` checks this).
 - Gate = held MIDI notes or the `trigger` param. A rising edge restarts the LFO. `env_step` is a linear 3 ms
-  attack and an exponential release (`release` param = time to -60 dB), snapping to 0 below -100 dB. The voice keeps running while
+  attack and an exponential release (`release` param = time to -60 dB), snapping to 0 below -100 dB. `drop_pos`
+  ramps 0→1 linearly over the same Release time after the gate closes; `Settings::bend` = Drop × `drop_pos`
+  semitones below the wobbling pitch. Volume is applied last, after the echo. The voice keeps running while
   the gate is closed so the release tail and filter states stay clean.
 - `Echo` runs after the gate envelope and keeps running when the gate is closed, so repeats ring out. Its buffer
   is allocated in `initialize()` (never in `process()`/`reset()`, which only clears it). Echo Time has a slow

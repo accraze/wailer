@@ -127,8 +127,8 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
                 (&params.howl, "HOWL"),
                 (&params.drive, "DRIVE"),
                 (&params.filter, "FILTER"),
-                (&params.volume, "VOLUME"),
                 (&params.release, "RELEASE"),
+                (&params.drop, "DROP"),
             ],
         ),
         (
@@ -138,6 +138,7 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
                 (&params.echo_feedback, "FEEDBACK"),
                 (&params.echo_wow, "WOW"),
                 (&params.echo_mix, "MIX"),
+                (&params.volume, "VOLUME"),
             ],
         ),
     ];
@@ -165,7 +166,7 @@ fn siren_box(ui: &Ui, setter: &ParamSetter, params: &WailerParams) {
     );
 
     shape_switch(ui, setter, &params.shape, Pos2::new(col(4), row1));
-    preset_selector(ui, setter, params, Pos2::new((col(4) + right) / 2.0, row3));
+    preset_selector(ui, setter, params, Pos2::new(right, row3));
     trigger(ui, setter, &params.trigger, Pos2::new(right, row2));
 }
 
@@ -414,8 +415,8 @@ fn apply_preset(setter: &ParamSetter, params: &WailerParams, preset: &Preset) {
 
 /// `‹ NAME ›` selector. Shows "CUSTOM" once the knobs no longer match a preset.
 fn preset_selector(ui: &Ui, setter: &ParamSetter, params: &WailerParams, center: Pos2) {
-    let slot = Rect::from_center_size(center, Vec2::new(150.0, 22.0));
-    let arrow_size = Vec2::new(22.0, slot.height());
+    let slot = Rect::from_center_size(center, Vec2::new(116.0, 22.0));
+    let arrow_size = Vec2::new(16.0, slot.height());
     let prev_rect = Rect::from_min_size(slot.left_top(), arrow_size);
     let next_rect =
         Rect::from_min_size(slot.right_top() - Vec2::new(arrow_size.x, 0.0), arrow_size);
@@ -477,7 +478,7 @@ fn preset_selector(ui: &Ui, setter: &ParamSetter, params: &WailerParams, center:
         slot.center(),
         Align2::CENTER_CENTER,
         name,
-        FontId::proportional(12.0),
+        FontId::proportional(11.0),
         color,
     );
     p.text(

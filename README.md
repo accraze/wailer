@@ -22,12 +22,13 @@ instrument: hold a MIDI note or the Trigger button to sound it.
 | Howl         | 0–100% feedback around the drive stage; squeals past ~70%    |
 | Drive        | 0–100%, clean → screaming (RAT gain stage + diode clipper)   |
 | Filter       | 0–100% (clockwise = darker)                                  |
-| Volume       | −30 to +12 dB                                                |
 | Release      | 0.01–5 s tail after you let go (time to fall 60 dB)          |
+| Drop         | 0–36 semitones the pitch glides down over the Release time   |
 | Echo Time    | 50 ms–1.5 s; glides, so turning it bends the repeats' pitch  |
 | Echo Feedback| 0–120%; past 100% the repeats run away (saturated, never blow up) |
 | Echo Wow     | 0–100% tape wow (up to ±2 ms)                                |
 | Echo Mix     | 0–100% repeats added on top of the dry siren (off by default) |
+| Volume       | −30 to +12 dB output level (after the echo)                  |
 | Preset       | ‹ › steps through 7 level-matched factory presets; shows CUSTOM once you tweak |
 
 Presets: Classic (dry two-tone, the default), Sound System, Police Wail, Laser, Rising Howl,
