@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "wailer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "nih_plug",
  "nih_plug_egui",
